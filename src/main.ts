@@ -3,15 +3,16 @@ import { MovableCamera } from './camera';
 import { Input } from './input';
 // import { Pane } from 'tweakpane';
 
-const scene = new THREE.Scene();
-const clock = new THREE.Clock();
-const input = new Input();
-const camera = new MovableCamera(input);
-
 const renderer = new THREE.WebGLRenderer();
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setAnimationLoop(animate);
 document.body.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const clock = new THREE.Clock();
+const input = new Input(renderer.domElement);
+const camera = new MovableCamera(input);
+input.registerMouseCb(evt => camera.tickMouse(evt));
 
 const geometry = new THREE.BoxGeometry(1, 1, 1);
 const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
