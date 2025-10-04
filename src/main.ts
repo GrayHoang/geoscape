@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+// import { Pane } from 'tweakpane';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -20,3 +21,15 @@ function animate() {
   cube.rotation.y += 0.01;
   renderer.render( scene, camera );
 }
+
+// const PARAMS = {
+// 	factor: 123,
+// 	title: 'hello',
+// 	color: '#ff0055',
+// };
+//
+// const pane = new Pane();
+//
+// pane.addBinding(PARAMS, 'factor');
+// pane.addBinding(PARAMS, 'title');
+// pane.addBinding(PARAMS, 'color');
