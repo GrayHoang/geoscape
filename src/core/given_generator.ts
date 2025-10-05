@@ -98,7 +98,8 @@ export class GivenGenerator {
             for (let x = minX; x < minX + chunkLength; x++) {
                 // Generate height using the terrain function
                 const worldPos = new THREE.Vector3(x, 0, z);
-                const height = this.terrainHeightMap(worldPos);
+                let height = this.terrainHeightMap(worldPos);
+                height = height * height * height;
                 
                 // Store in height map
                 chunk.setHeightAt(x, z, height);
