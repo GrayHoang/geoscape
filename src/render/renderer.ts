@@ -73,6 +73,8 @@ export class Renderer {
 			varying mat4 invProjMat;
 			varying mat4 invViewMat;
 
+			const float chunkSize = 5.0;
+
 			struct Ray {
 				vec3 pos;
 				vec3 dir;
@@ -97,7 +99,11 @@ export class Renderer {
 				// gl_FragColor = vec4(bufIdx / 5.0, 1.0, 1.0);
 				// gl_FragColor = vec4(localPos, 1.0);
 				// gl_FragColor = vec4(getPrimaryRay().dir, 1.0);
-				gl_FragColor = vec4(vec3(texture(heightmap, gl_FragCoord.xy / scrSize * 0.2).r - 1.0), 1.0);
+				vec2 uv = gl_FragCoord.xy / scrSize;
+				uv += bufIdx;
+				uv /= chunkSize;
+				gl_FragColor = vec4(vec3(texture(heightmap, uv).r - 1.0), 1.0);
+
 // Ray ray = getPrimaryRay();
 // 	vec3 ro = ray.pos;
 // 	vec3 rd = normalize(ray.dir);
