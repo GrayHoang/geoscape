@@ -13,7 +13,7 @@ export class Renderer {
 	scene = new THREE.Scene();
 	input = new Input(this.webgl.domElement);
 	camera = new MovableCamera(this.input);
-
+    
 	bbTransforms = new Float32Array(VIEW_DIAMETER**2 * 4);
 
 	chunks = new ChunkManager(VIEW_DIAMETER, CHUNK_SIZE);
@@ -213,17 +213,48 @@ Hit marchXZ(Ray primary) {
 				return Hit(false, P, 0u);
 			}
 
+            vec3 heightColor(float h) {
+                if (h < 0.3) {
+                    return mix(vec3(0.2, 0.1, 0.05), vec3(0.33, 0.27, 0.13), h / 0.3);
+                } else if (h < 0.5) {
+                    return mix(vec3(0.33, 0.27, 0.13), vec3(0.1, 0.2, 0.1), (h - 0.3) / 0.2);
+                } else if (h < 0.65) {
+                    return mix(vec3(0.1, 0.2, 0.1), vec3(0.0, 0.4, 0.0), (h - 0.5) / 0.15);
+                } else if (h < 0.8) {
+                    return mix(vec3(0.0, 0.4, 0.0), vec3(0.0, 0.278, 0.0), (h - 0.65) / 0.15);
+                } else {
+                    return mix(vec3(0.0, 0.278, 0.0), vec3(0.2, 0.6, 0.2), (h - 0.8) / 0.2);
+                }
+            }
+
+            const vec3 DOWN = vec3(0, -1, 0);
+
 			void main() {
 				vec2 uv = gl_FragCoord.xy / scrSize;
 				uv += bufIdx;
 				uv /= viewDiameter;
 				gl_FragColor = vec4(vec3(texture(heightmap, uv).r - 2.0), 1.0);
-
+               
 				Ray ray = getPrimaryRay();
-				Hit hit = marchXZ(ray);
+				Hit hit;
+                if (dot(ray.dir, DOWN) >= sqrt(2.0)/2.0) {
+                    hit = marchXZ(ray);
+                } else {
+                    hit = march(ray);
+                }
 
 				if (hit.hit) {
-					gl_FragColor = vec4(hit.pos, 1.0);
+
+                    float normY = clamp((hit.pos.y - chunkMinY) / (chunkMaxY - chunkMinY), 0.0, 1.0);
+                    vec3 baseColor = heightColor(normY);
+                    vec3 lightDir = normalize(vec3(0.5, 2.0, 0.5));
+                    float lightIntensity = clamp(dot(normalize(vec3(0.5, 1.0, 0.5)), lightDir), 0.0, 1.0);
+                    vec3 shadowTint = vec3(0.2, 0.5, 0.1);
+                    vec3 finalColor = mix(shadowTint, baseColor, lightIntensity);
+                    gl_FragColor = vec4(finalColor, 1.0);
+
+
+					// gl_FragColor = vec4(hit.pos, 1.0);
 					// gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
 					// gl_FragColor = vec4(vec3(float(hit.steps) / float(64)) * 2.0, 1.0);
 				} else {
@@ -241,6 +272,9 @@ Hit marchXZ(Ray primary) {
 		this.webgl.setAnimationLoop(() => this.tick());
 		document.body.appendChild(this.webgl.domElement);
 		document.onresize = this.resize;
+        this.scene.background = new THREE.Color(0x87CEFA);
+        this.webgl.setClearColor(0x87CEFA, 1);
+        document.body.style.background = '#87CEFA';
 
 		this.input = new Input(this.webgl.domElement);
 		this.camera = new MovableCamera(this.input);
