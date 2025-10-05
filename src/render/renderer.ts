@@ -3,9 +3,8 @@ import { Input } from '../input';
 import { MovableCamera } from './camera';
 import { ChunkManager } from '../core/chunkManager';
 
-const CHUNK_SZ = 1;     // Side length of a chunk in world units
-const VIEW_DIAMETER = 5; // Side length of a "batch" of chunks in number of chunks
-const CHUNK_SIZE = 32; // Side length of a chunk in pixels?
+const VIEW_DIAMETER = 5; // Side length of the visible x-z rectangle of chunks
+const CHUNK_SIZE = 32;   // Side length of a chunk in pixels?
 
 let chunks: ChunkManager = new ChunkManager(VIEW_DIAMETER, CHUNK_SIZE);
 
@@ -42,13 +41,33 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 	fragmentShader: `
 		varying vec2 bufIdx;
 		varying vec3 localPos;
+
+		struct Ray {
+			vec3 pos;
+			vec3 dir;
+		};
+
+		// pos's value is undefined when hit is false
+		struct Hit {
+			bool hit;
+			ivec3 pos;
+			uint steps;
+		};
+
+		Ray getPrimaryRay() {
+			vec2 uv = (gl_FragCoord.xy / scr_size) * 2.0 - 1.0;
+			vec4 targ = inv_proj * vec4(uv, 1.0, 1.0);
+			vec4 dir = inv_view * vec4(normalize(targ.xyz / targ.w), 0.0);
+			return Ray(localPos, dir.xyz);
+		}
+
 		void main() {
 			// gl_FragColor = vec4(localPos, 1.0);
 			gl_FragColor = vec4(localPos * 0.5, 1.0);
 		}
 	`,
 });
-const BB_GEOM = new THREE.BoxGeometry(CHUNK_SZ, CHUNK_SZ, CHUNK_SZ);
+const BB_GEOM = new THREE.BoxGeometry(1, 1, 1);
 const DEBUG_GREEN = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
 const DEBUG_STD = new THREE.MeshStandardMaterial();
 
