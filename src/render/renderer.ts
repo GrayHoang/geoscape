@@ -102,7 +102,7 @@ export class Renderer {
 				vec2 uv = gl_FragCoord.xy / scrSize;
 				uv += bufIdx;
 				uv /= chunkSize;
-				gl_FragColor = vec4(vec3(texture(heightmap, uv).r - 1.0), 1.0);
+				gl_FragColor = vec4(vec3(texture(heightmap, uv).r - 2.0), 1.0);
 
 // Ray ray = getPrimaryRay();
 // 	vec3 ro = ray.pos;
