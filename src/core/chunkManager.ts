@@ -2,6 +2,8 @@
 export class ChunkManager {
     int numChunks; // width/height of the chunk array
     chunk[] array_chunks // the square array of chunks
+    
+    constructor(numChunks){} //build a square array side length numChunks
 
     getminy(chunkx, chunkz) // get the miny at chunkx and chunk z
     getmaxy(chunkx,chunkz) // get the maxy at chunkx and chunkz
