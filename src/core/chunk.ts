@@ -63,7 +63,7 @@ export class Chunk {
 	}
 
 	getMinZ(): number {
-		return this.minX;
+		return this.minZ;
 	}
 
 	setMinZ(z: number) {

@@ -1,9 +1,13 @@
 import * as THREE from 'three';
 import { Input } from '../input';
 import { MovableCamera } from './camera';
+import { ChunkManager } from '../core/chunkManager';
 
 const CHUNK_SZ = 1;     // Side length of a chunk in world units
 const VIEW_DIAMETER = 5; // Side length of a "batch" of chunks in number of chunks
+const CHUNK_SIZE = 32; // Side length of a chunk in pixels?
+
+let chunks: ChunkManager = new ChunkManager(VIEW_DIAMETER, CHUNK_SIZE);
 
 const RAYMARCH_MAT = new THREE.ShaderMaterial({
 	// TODO actually read these from files
@@ -75,10 +79,13 @@ export class Renderer {
 		this.scene.add(this.instance);
 
 		for (let i = 0; i < VIEW_DIAMETER * VIEW_DIAMETER; i++) {
-			this.bbTransforms[i * 4 + 0] = i % VIEW_DIAMETER;
+            let x = i % VIEW_DIAMETER;
+            let z = Math.floor(i/VIEW_DIAMETER);
+			this.bbTransforms[i * 4 + 0] = x;
 			this.bbTransforms[i * 4 + 1] = 0; // y min
-			this.bbTransforms[i * 4 + 2] = Math.floor(i / VIEW_DIAMETER);
-			this.bbTransforms[i * 4 + 3] = (i + 1) * 0.1; // height
+			this.bbTransforms[i * 4 + 2] = z;
+			this.bbTransforms[i * 4 + 3] = chunks.getHeight(x,z); // height
+            console.log(chunks.getHeight(x,z));
 		}
 
 		BB_GEOM.setAttribute(
