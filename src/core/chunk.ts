@@ -13,7 +13,7 @@ export interface ChunkDimensions {
 }
 
 export interface HeightMap {
-	data: Float32Array; // 256 height data entries
+	data: Float32Array; // resolution x resolution height data entries
 	resolution: number;  // resolution of height map (e.g., 16x16 = 256 entries)
 }
 
