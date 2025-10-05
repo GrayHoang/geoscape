@@ -10,12 +10,17 @@ let chunks: ChunkManager = new ChunkManager(VIEW_DIAMETER, CHUNK_SIZE);
 
 const RAYMARCH_MAT = new THREE.ShaderMaterial({
 	// TODO actually read these from files
+	uniforms: {
+		scrSize: new THREE.Uniform(new THREE.Vector2()),
+	},
 	vertexShader: `
 		attribute vec4 transforms;
 
 		// x,z after modulo
 		varying vec2 bufIdx;
 		varying vec3 localPos;
+		varying mat4 invProjMat;
+		varying mat4 invViewMat;
 
 		const uint VIEW_DIAMETER = 5u;
 
@@ -36,11 +41,18 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 			// localPos.y = pos.y;
 			bufIdx.x = float(uint(pos.x) % VIEW_DIAMETER);
 			bufIdx.y = float(uint(pos.z) % VIEW_DIAMETER);
+
+			invProjMat = inverse(projectionMatrix);
+			invViewMat = inverse(modelViewMatrix);
 		}
 	`,
 	fragmentShader: `
+		uniform vec2 scrSize;
+
 		varying vec2 bufIdx;
 		varying vec3 localPos;
+		varying mat4 invProjMat;
+		varying mat4 invViewMat;
 
 		struct Ray {
 			vec3 pos;
@@ -55,15 +67,15 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 		};
 
 		Ray getPrimaryRay() {
-			vec2 uv = (gl_FragCoord.xy / scr_size) * 2.0 - 1.0;
-			vec4 targ = inv_proj * vec4(uv, 1.0, 1.0);
-			vec4 dir = inv_view * vec4(normalize(targ.xyz / targ.w), 0.0);
+			vec2 uv = (gl_FragCoord.xy / scrSize) * 2.0 - 1.0;
+			vec4 targ = invProjMat * vec4(uv, 1.0, 1.0);
+			vec4 dir = invViewMat * vec4(normalize(targ.xyz / targ.w), 0.0);
 			return Ray(localPos, dir.xyz);
 		}
 
 		void main() {
 			// gl_FragColor = vec4(localPos, 1.0);
-			gl_FragColor = vec4(localPos * 0.5, 1.0);
+			gl_FragColor = vec4(getPrimaryRay().dir, 1.0);
 		}
 	`,
 });
@@ -104,7 +116,6 @@ export class Renderer {
 			this.bbTransforms[i * 4 + 1] = chunks.getMinY(x,z); // y min
 			this.bbTransforms[i * 4 + 2] = z;
 			this.bbTransforms[i * 4 + 3] = chunks.getHeight(x,z); // height
-            console.log(chunks.getHeight(x,z));
 		}
 
 		BB_GEOM.setAttribute(
@@ -115,6 +126,10 @@ export class Renderer {
 
 	resize() {
 		this.webgl.setSize(window.innerWidth, window.innerHeight);
+		this.instance.material.uniforms.scrSize.value = new THREE.Vector2(
+			window.innerWidth,
+			window.innerHeight
+		);
 	}
 
 	tick() {
