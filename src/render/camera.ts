@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Input } from './input';
+import type { Input } from '../input';
 
 const UP_VEC = new THREE.Vector3(0.0, 1.0, 0.0);
 const ROT_SPEED = 0.1;

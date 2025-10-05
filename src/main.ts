@@ -1,28 +1,30 @@
 import * as THREE from 'three';
-import { MovableCamera } from './camera';
+import { MovableCamera } from './render/camera';
 import { Input } from './input';
 // import { Pane } from 'tweakpane';
 
-const renderer = new THREE.WebGLRenderer();
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setAnimationLoop(animate);
-document.body.appendChild(renderer.domElement);
+const webgl = new THREE.WebGLRenderer();
+webgl.setSize(window.innerWidth, window.innerHeight);
+webgl.setAnimationLoop(animate);
+document.body.appendChild(webgl.domElement);
 
-const scene = new THREE.Scene();
-const clock = new THREE.Clock();
-const input = new Input(renderer.domElement);
+const input = new Input(webgl.domElement);
 const camera = new MovableCamera(input);
 input.registerMouseCb(evt => camera.tickMouse(evt));
+
+const clock = new THREE.Clock();
 
 const geometry = new THREE.BoxGeometry(1, 1, 1);
 const material = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
 const cube = new THREE.Mesh(geometry, material);
+
+const scene = new THREE.Scene();
 scene.add(cube);
 
 function animate() {
 	const dt = clock.getDelta();
 	camera.tick(dt);
-  renderer.render(scene, camera.inner);
+  webgl.render(scene, camera.inner);
 }
 
 // const PARAMS = {
