@@ -12,18 +12,35 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 
 		// x,z after modulo
 		varying vec2 bufIdx;
+		varying vec3 localPos;
 
-		const float CHUNK_RADIUS = 4.0;
+		const uint VIEW_DIAMETER = 5u;
 
 		void main() {
-			// bufIdx = vec2(pos.x % CHUNK_RADIUS, pos.y % CHUNK_RADIUS);
-			gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x + transforms.x, (position.y + 0.5) * transforms.w + transforms.y - 0.5, position.z + transforms.z, 1.0);
+			vec3 posPre = position + vec3(0.5);
+
+			vec3 pos = posPre;
+			pos.xz += transforms.xz;
+			pos.y = (pos.y) * transforms.w + transforms.y;
+
+			localPos = posPre;
+			localPos.xz = posPre.xz;
+			localPos.y = (posPre.y) * transforms.w;
+
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+
+			// localPos.xz = posPre.xz;
+			// localPos.y = pos.y;
+			bufIdx.x = float(uint(pos.x) % VIEW_DIAMETER);
+			bufIdx.y = float(uint(pos.z) % VIEW_DIAMETER);
 		}
 	`,
 	fragmentShader: `
 		varying vec2 bufIdx;
+		varying vec3 localPos;
 		void main() {
-			gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+			// gl_FragColor = vec4(localPos, 1.0);
+			gl_FragColor = vec4(localPos * 0.5, 1.0);
 		}
 	`,
 });
@@ -53,6 +70,8 @@ export class Renderer {
 		this.input.registerMouseCb(evt => this.camera.tickMouse(evt));
 
 		this.instance.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+		// ISSUE: when the base instance is outside the view frustum, the other instances also disappear. i don't think we can fix this, so just disable frustum culling entirely
+		this.instance.frustumCulled = false;
 		this.scene.add(this.instance);
 
 		for (let i = 0; i < VIEW_DIAMETER * VIEW_DIAMETER; i++) {

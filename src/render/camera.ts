@@ -20,7 +20,8 @@ export class MovableCamera {
 			2000
 		);
 		this.inner.getWorldDirection(this.#dir);
-		this.inner.position.z = 5;
+		this.inner.position.x = 2;
+		this.inner.position.z = 10;
 		this.#input = input;
 		this.#lastDt = 0.0;
 
