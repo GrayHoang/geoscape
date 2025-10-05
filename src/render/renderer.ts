@@ -7,84 +7,6 @@ const VIEW_DIAMETER = 5; // Side length of the visible x-z rectangle of chunks
 const CHUNK_SIZE = 32;   // Side length of a chunk in pixels?
 const HEIGHTMAP_SIZE = VIEW_DIAMETER*CHUNK_SIZE; // in pixels
 
-let chunks: ChunkManager = new ChunkManager(VIEW_DIAMETER, CHUNK_SIZE);
-
-const RAYMARCH_MAT = new THREE.ShaderMaterial({
-	// TODO actually read these from files
-	uniforms: {
-		scrSize: new THREE.Uniform(new THREE.Vector2()),
-	},
-	vertexShader: `
-		attribute vec4 transforms;
-
-		// x,z after modulo
-		flat varying vec2 bufIdx;
-		varying vec3 localPos;
-		varying mat4 invProjMat;
-		varying mat4 invViewMat;
-
-		const uint VIEW_DIAMETER = 5u;
-
-		void main() {
-			vec3 posPre = position + vec3(0.5);
-
-			vec3 pos = posPre;
-			pos.xz += transforms.xz;
-			pos.y = (pos.y) * transforms.w + transforms.y;
-
-			localPos = posPre;
-			localPos.xz = posPre.xz;
-			localPos.y = (posPre.y) * transforms.w;
-
-			gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
-
-			// localPos.xz = posPre.xz;
-			// localPos.y = pos.y;
-			bufIdx.x = float(uint(transforms.x) % VIEW_DIAMETER);
-			bufIdx.y = float(uint(transforms.z) % VIEW_DIAMETER);
-
-			invProjMat = inverse(projectionMatrix);
-			invViewMat = inverse(modelViewMatrix);
-		}
-	`,
-	fragmentShader: `
-		uniform vec2 scrSize;
-
-		flat varying vec2 bufIdx;
-		varying vec3 localPos;
-		varying mat4 invProjMat;
-		varying mat4 invViewMat;
-
-		struct Ray {
-			vec3 pos;
-			vec3 dir;
-		};
-
-		// pos's value is undefined when hit is false
-		struct Hit {
-			bool hit;
-			ivec3 pos;
-			uint steps;
-		};
-
-		Ray getPrimaryRay() {
-			vec2 uv = (gl_FragCoord.xy / scrSize) * 2.0 - 1.0;
-			vec4 targ = invProjMat * vec4(uv, 1.0, 1.0);
-			vec4 dir = invViewMat * vec4(normalize(targ.xyz / targ.w), 0.0);
-			return Ray(localPos, dir.xyz);
-		}
-
-		void main() {
-			gl_FragColor = vec4(bufIdx / 5.0, 1.0, 1.0);
-			// gl_FragColor = vec4(localPos, 1.0);
-			// gl_FragColor = vec4(getPrimaryRay().dir, 1.0);
-		}
-	`,
-});
-const BB_GEOM = new THREE.BoxGeometry(1, 1, 1);
-const DEBUG_GREEN = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-const DEBUG_STD = new THREE.MeshStandardMaterial();
-
 export class Renderer {
 	webgl = new THREE.WebGLRenderer();
 	clock = new THREE.Clock();
@@ -94,9 +16,85 @@ export class Renderer {
 
 	bbTransforms = new Float32Array(VIEW_DIAMETER**2 * 4);
 
+	chunks = new ChunkManager(VIEW_DIAMETER, CHUNK_SIZE);
 	heightmapData = new Float32Array(HEIGHTMAP_SIZE**2);
 	heightmap = new THREE.DataTexture(this.heightmapData, HEIGHTMAP_SIZE, HEIGHTMAP_SIZE);
-	instance = new THREE.InstancedMesh(BB_GEOM, RAYMARCH_MAT, VIEW_DIAMETER**2);
+	material = new THREE.ShaderMaterial({
+		// TODO actually read these from files
+		uniforms: {
+			scrSize: new THREE.Uniform(new THREE.Vector2()),
+			heightmap: { value: this.heightmap },
+		},
+		vertexShader: `
+			attribute vec4 transforms;
+
+			// x,z after modulo
+			flat varying vec2 bufIdx;
+			varying vec3 localPos;
+			varying mat4 invProjMat;
+			varying mat4 invViewMat;
+
+			const uint VIEW_DIAMETER = 5u;
+
+			void main() {
+				vec3 posPre = position + vec3(0.5);
+
+				vec3 pos = posPre;
+				pos.xz += transforms.xz;
+				pos.y = (pos.y) * transforms.w + transforms.y;
+
+				localPos = posPre;
+				localPos.xz = posPre.xz;
+				localPos.y = (posPre.y) * transforms.w;
+
+				gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+
+				// localPos.xz = posPre.xz;
+				// localPos.y = pos.y;
+				bufIdx.x = float(uint(transforms.x) % VIEW_DIAMETER);
+				bufIdx.y = float(uint(transforms.z) % VIEW_DIAMETER);
+
+				invProjMat = inverse(projectionMatrix);
+				invViewMat = inverse(modelViewMatrix);
+			}
+		`,
+		fragmentShader: `
+			uniform vec2 scrSize;
+			uniform sampler2D heightmap;
+
+			flat varying vec2 bufIdx;
+			varying vec3 localPos;
+			varying mat4 invProjMat;
+			varying mat4 invViewMat;
+
+			struct Ray {
+				vec3 pos;
+				vec3 dir;
+			};
+
+			// pos's value is undefined when hit is false
+			struct Hit {
+				bool hit;
+				ivec3 pos;
+				uint steps;
+			};
+
+			Ray getPrimaryRay() {
+				vec2 uv = (gl_FragCoord.xy / scrSize) * 2.0 - 1.0;
+				vec4 targ = invProjMat * vec4(uv, 1.0, 1.0);
+				vec4 dir = invViewMat * vec4(normalize(targ.xyz / targ.w), 0.0);
+				return Ray(localPos, dir.xyz);
+			}
+
+			void main() {
+				gl_FragColor = vec4(bufIdx / 5.0, 1.0, 1.0);
+				// gl_FragColor = vec4(localPos, 1.0);
+				// gl_FragColor = vec4(getPrimaryRay().dir, 1.0);
+			}
+		`,
+	})
+	bbGeom = new THREE.BoxGeometry(1, 1, 1);
+	instance = new THREE.InstancedMesh(this.bbGeom, this.material, VIEW_DIAMETER**2);
 	
 	constructor() {
 		this.resize();
@@ -108,6 +106,12 @@ export class Renderer {
 		this.camera = new MovableCamera(this.input);
 		this.input.registerMouseCb(evt => this.camera.tickMouse(evt));
 
+		this.heightmap.needsUpdate = true;
+		this.heightmap.minFilter = THREE.NearestFilter;
+		this.heightmap.magFilter = THREE.NearestFilter;
+		this.heightmap.wrapS = THREE.ClampToEdgeWrapping;
+		this.heightmap.wrapT = THREE.ClampToEdgeWrapping;
+
 		this.instance.instanceMatrix.setUsage(THREE.StaticDrawUsage);
 		// ISSUE: when the base instance is outside the view frustum, the other instances also disappear. i don't think we can fix this, so just disable frustum culling entirely
 		this.instance.frustumCulled = false;
@@ -117,12 +121,12 @@ export class Renderer {
             let x = i % VIEW_DIAMETER;
             let z = Math.floor(i/VIEW_DIAMETER);
 			this.bbTransforms[i * 4 + 0] = x;
-			this.bbTransforms[i * 4 + 1] = chunks.getMinY(x,z); // y min
+			this.bbTransforms[i * 4 + 1] = this.chunks.getMinY(x,z); // y min
 			this.bbTransforms[i * 4 + 2] = z;
-			this.bbTransforms[i * 4 + 3] = chunks.getHeight(x,z); // height
+			this.bbTransforms[i * 4 + 3] = this.chunks.getHeight(x,z); // height
 		}
 
-		BB_GEOM.setAttribute(
+		this.bbGeom.setAttribute(
 			'transforms',
 			new THREE.InstancedBufferAttribute(this.bbTransforms, 4),
 		);
