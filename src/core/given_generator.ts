@@ -1,10 +1,5 @@
 import * as THREE from 'three';
-
-// Constants
-const PI = 3.14159;
-const PI2 = 6.28318;
-const HFPI = 1.57079;
-const EPSILON = 1e-10;
+import { Chunk } from "./chunk.ts"
 
 export class GivenGenerator {
     
@@ -89,128 +84,35 @@ export class GivenGenerator {
     }
 
     /**
-     * Step count cost color - TypeScript implementation
-     */
-    public stepCountCostColor(bias: number): THREE.Vector3 {
-        const offset = new THREE.Vector3(0.938, 0.328, 0.718);
-        const amplitude = new THREE.Vector3(0.902, 0.4235, 0.1843);
-        const frequency = new THREE.Vector3(0.7098, 0.7098, 0.0824);
-        const phase = new THREE.Vector3(2.538, 2.478, 0.168);
-
-        const result = new THREE.Vector3();
-        result.x = offset.x + amplitude.x * Math.cos(PI2 * (frequency.x * bias + phase.x));
-        result.y = offset.y + amplitude.y * Math.cos(PI2 * (frequency.y * bias + phase.y));
-        result.z = offset.z + amplitude.z * Math.cos(PI2 * (frequency.z * bias + phase.z));
-        
-        return result;
-    }
-
-    /**
-     * Get normal vector - TypeScript implementation
-     */
-    public getNormal(rayTerrainIntersection: THREE.Vector3, t: number): THREE.Vector3 {
-        const eps = new THREE.Vector3(0.001 * t, 0.0, 0.0);
-        
-        const h1 = this.terrainHeightMap(new THREE.Vector3(
-            rayTerrainIntersection.x - eps.x,
-            rayTerrainIntersection.y,
-            rayTerrainIntersection.z
-        ));
-        
-        const h2 = this.terrainHeightMap(new THREE.Vector3(
-            rayTerrainIntersection.x + eps.x,
-            rayTerrainIntersection.y,
-            rayTerrainIntersection.z
-        ));
-        
-        const h3 = this.terrainHeightMap(new THREE.Vector3(
-            rayTerrainIntersection.x,
-            rayTerrainIntersection.y,
-            rayTerrainIntersection.z - eps.x
-        ));
-        
-        const h4 = this.terrainHeightMap(new THREE.Vector3(
-            rayTerrainIntersection.x,
-            rayTerrainIntersection.y,
-            rayTerrainIntersection.z + eps.x
-        ));
-        
-        const n = new THREE.Vector3(
-            h1 - h2,
-            2.0 * eps.x,
-            h3 - h4
-        );
-        
-        return n.normalize();
-    }
-
-    /**
-     * Compute look-at matrix - TypeScript implementation
-     */
-    public computeLookAtMatrix(cameraOrigin: THREE.Vector3, target: THREE.Vector3, roll: number): THREE.Matrix3 {
-        const rr = new THREE.Vector3(Math.sin(roll), Math.cos(roll), 0.0);
-        const ww = new THREE.Vector3().subVectors(target, cameraOrigin).normalize();
-        const uu = new THREE.Vector3().crossVectors(ww, rr).normalize();
-        const vv = new THREE.Vector3().crossVectors(uu, ww).normalize();
-
-        return new THREE.Matrix3().setFromMatrix4(
-            new THREE.Matrix4().makeBasis(uu, vv, ww)
-        );
-    }
-
-    /**
-     * Convert to linear color space - TypeScript implementation
-     */
-    public toLinear(inputColor: THREE.Vector3): THREE.Vector3 {
-        return new THREE.Vector3(
-            Math.pow(inputColor.x, 2.2),
-            Math.pow(inputColor.y, 2.2),
-            Math.pow(inputColor.z, 2.2)
-        );
-    }
-
-    /**
-     * Convert to sRGB color space - TypeScript implementation
-     */
-    public tosRGB(inputColor: THREE.Vector3): THREE.Vector3 {
-        return new THREE.Vector3(
-            Math.pow(inputColor.x, 1.0 / 2.2),
-            Math.pow(inputColor.y, 1.0 / 2.2),
-            Math.pow(inputColor.z, 1.0 / 2.2)
-        );
-    }
-
-    /**
      * Generate height map for a chunk using the given generator
      */
-    public generateHeightMapForChunk(
-        chunkPosition: { x: number; z: number },
-        chunkDimensions: { width: number; depth: number; height: number },
-        resolution: number = 16
-    ): Float32Array {
-        const heightData = new Float32Array(resolution * resolution);
+    public generateHeightMapForChunk(chunk: Chunk) {
+        const minX = chunk.getMinX();
+        const minZ = chunk.getMinZ();
+        const chunkLength: number = chunk.getLength();
+        let minY: number = chunk.getMinY();
+        let maxY: number = chunk.getMaxY();
         
-        // Calculate world bounds for this chunk
-        const minX = chunkPosition.x * chunkDimensions.width;
-        const minZ = chunkPosition.z * chunkDimensions.depth;
-
         // Generate height for each grid point
-        for (let z = 0; z < resolution; z++) {
-            for (let x = 0; x < resolution; x++) {
-                // Convert grid coordinates to world coordinates
-                const worldX = minX + (x / (resolution - 1)) * chunkDimensions.width;
-                const worldZ = minZ + (z / (resolution - 1)) * chunkDimensions.depth;
-                
+        for (let z = minZ; z < minZ + chunkLength; z++) {
+            for (let x = minX; x < minX + chunkLength; x++) {
                 // Generate height using the terrain function
-                const worldPos = new THREE.Vector3(worldX, 0, worldZ);
+                const worldPos = new THREE.Vector3(minX, 0, minZ);
                 const height = this.terrainHeightMap(worldPos);
                 
                 // Store in height map
-                const index = z * resolution + x;
-                heightData[index] = height;
+                chunk.setHeightAt(minX, minZ, height);
+
+                // check min/max
+                if (height < minY) {
+                    chunk.setMinY(height);
+                    minY = height;
+                }
+                if (height > maxY) {
+                    chunk.setMaxY(height);
+                    maxY = height;
+                }
             }
         }
-
-        return heightData;
     }
 }
