@@ -3,7 +3,7 @@ import type { Input } from '../input';
 
 const UP_VEC = new THREE.Vector3(0.0, 1.0, 0.0);
 const ROT_SPEED = 0.1;
-const MOVE_SPEED = 1.0;
+const MOVE_SPEED = 5.0;
 
 export class MovableCamera {
 	inner: THREE.PerspectiveCamera;

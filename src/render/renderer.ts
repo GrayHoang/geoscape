@@ -5,6 +5,7 @@ import { ChunkManager } from '../core/chunkManager';
 
 const VIEW_DIAMETER = 5; // Side length of the visible x-z rectangle of chunks
 const CHUNK_SIZE = 32;   // Side length of a chunk in pixels?
+const HEIGHTMAP_SIZE = VIEW_DIAMETER*CHUNK_SIZE; // in pixels
 
 let chunks: ChunkManager = new ChunkManager(VIEW_DIAMETER, CHUNK_SIZE);
 
@@ -17,7 +18,7 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 		attribute vec4 transforms;
 
 		// x,z after modulo
-		varying vec2 bufIdx;
+		flat varying vec2 bufIdx;
 		varying vec3 localPos;
 		varying mat4 invProjMat;
 		varying mat4 invViewMat;
@@ -39,8 +40,8 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 
 			// localPos.xz = posPre.xz;
 			// localPos.y = pos.y;
-			bufIdx.x = float(uint(pos.x) % VIEW_DIAMETER);
-			bufIdx.y = float(uint(pos.z) % VIEW_DIAMETER);
+			bufIdx.x = float(uint(transforms.x) % VIEW_DIAMETER);
+			bufIdx.y = float(uint(transforms.z) % VIEW_DIAMETER);
 
 			invProjMat = inverse(projectionMatrix);
 			invViewMat = inverse(modelViewMatrix);
@@ -49,7 +50,7 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 	fragmentShader: `
 		uniform vec2 scrSize;
 
-		varying vec2 bufIdx;
+		flat varying vec2 bufIdx;
 		varying vec3 localPos;
 		varying mat4 invProjMat;
 		varying mat4 invViewMat;
@@ -74,8 +75,9 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 		}
 
 		void main() {
+			gl_FragColor = vec4(bufIdx / 5.0, 1.0, 1.0);
 			// gl_FragColor = vec4(localPos, 1.0);
-			gl_FragColor = vec4(getPrimaryRay().dir, 1.0);
+			// gl_FragColor = vec4(getPrimaryRay().dir, 1.0);
 		}
 	`,
 });
@@ -90,9 +92,11 @@ export class Renderer {
 	input = new Input(this.webgl.domElement);
 	camera = new MovableCamera(this.input);
 
-	bbTransforms = new Float32Array(VIEW_DIAMETER * VIEW_DIAMETER * 4);
+	bbTransforms = new Float32Array(VIEW_DIAMETER**2 * 4);
 
-	instance = new THREE.InstancedMesh(BB_GEOM, RAYMARCH_MAT, VIEW_DIAMETER * VIEW_DIAMETER);
+	heightmapData = new Float32Array(HEIGHTMAP_SIZE**2);
+	heightmap = new THREE.DataTexture(this.heightmapData, HEIGHTMAP_SIZE, HEIGHTMAP_SIZE);
+	instance = new THREE.InstancedMesh(BB_GEOM, RAYMARCH_MAT, VIEW_DIAMETER**2);
 	
 	constructor() {
 		this.resize();
