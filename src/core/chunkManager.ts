@@ -24,7 +24,7 @@ export class ChunkManager {
     // getmaxy(chunkx,chunkz) // get the maxy at chunkx and chunkz
     getHeight(chunkx: number, chunkz: number): number {
         
-        return (this.array_chunks[chunkz*this.numChunks + chunkx].getMaxY() - this.array_chunks[chunkz*this.numChunks + chunkx].getMinY())/this.numPixels;
+        return (this.array_chunks[chunkz*this.numChunks + chunkx].getMaxY() - this.array_chunks[chunkz*this.numChunks + chunkx].getMinY());
     } // get the height of the chunk at x and z
     
     // getchunkdata(chunkx, chunkz) //get the data 

@@ -82,7 +82,7 @@ export class Renderer {
             let x = i % VIEW_DIAMETER;
             let z = Math.floor(i/VIEW_DIAMETER);
 			this.bbTransforms[i * 4 + 0] = x;
-			this.bbTransforms[i * 4 + 1] = 0; // y min
+			this.bbTransforms[i * 4 + 1] = chunks.getMinY(x,z); // y min
 			this.bbTransforms[i * 4 + 2] = z;
 			this.bbTransforms[i * 4 + 3] = chunks.getHeight(x,z); // height
             console.log(chunks.getHeight(x,z));
