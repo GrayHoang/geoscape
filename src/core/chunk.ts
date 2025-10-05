@@ -1,92 +1,96 @@
 // cubic chunks, sent to the gpu
 // GridSquare heightmap --> rendered geometry mesh
 
-export interface ChunkPosition {
-	x: number; // chunk coordinate on x-axis
-	z: number; // chunk coordinate on z-axis (depth)
-}
-
-export interface ChunkDimensions {
-	width: number;  // width in world units (x-axis)
-	depth: number;  // depth in world units (z-axis)
-	height: number; // height in world units (y-axis)
-}
-
-export interface HeightMap {
-	data: Float32Array; // resolution x resolution height data entries
-	resolution: number;  // resolution of height map (e.g., 16x16 = 256 entries)
-}
-
+// CHUNK == COLUMN
+// CUBE == BOUNDING BOX
 export class Chunk {
-	private position: ChunkPosition;
-	private dimensions: ChunkDimensions;
-	private heightMap: HeightMap;
+	private length: number; // 16
+	private heightMap: Float32Array;
+	private minX: number;
+	private maxX: number;
+	private minZ: number;
+	private maxZ: number;
+	private minY: number;
+	private maxY: number;
 
-	constructor(position: ChunkPosition, dimensions: ChunkDimensions) {
-		this.position = position;
-		this.dimensions = dimensions;
-		this.heightMap = {
-			data: new Float32Array(256), // 16x16 grid = 256 height entries
-			resolution: 16
-		};
+	constructor(minX: number, minZ: number, length: number) {
+		this.minX = minX;
+		this.maxX = minX + length - 1;
+		this.minZ = minZ;
+		this.maxZ = minZ + length - 1;
+		this.length = length;
+		this.heightMap =  new Float32Array(length * length); // 16x16 grid = 256 height entries
+		this.minY = 0;
+        this.maxY = Infinity;
 	}
 
-	// Getters for position and dimensions
-	getPosition(): ChunkPosition {
-		return this.position;
+	getLength(): number {
+		return this.length;
 	}
 
-	getDimensions(): ChunkDimensions {
-		return this.dimensions;
+	getHeightMap(): Float32Array {
+		return this.heightMap;
 	}
 
-	// Height map management
-	getHeightMap(): HeightMap {
-		return {
-			data: new Float32Array(this.heightMap.data),
-			resolution: this.heightMap.resolution
-		};
+	setHeightMap(heightMap: Float32Array) {
+		this.heightMap = heightMap;
 	}
 
-	setHeightMap(heightMap: HeightMap): void {
-		this.heightMap = {
-			data: new Float32Array(heightMap.data),
-			resolution: heightMap.resolution
-		};
-	}
-
-	// Get height at specific local coordinates within the chunk
 	getHeightAt(x: number, z: number): number {
-
-		// Clamp coordinates to valid range
-		const clampedX = Math.max(0, Math.min(this.heightMap.resolution - 1, x));
-		const clampedZ = Math.max(0, Math.min(this.heightMap.resolution - 1, z));
-		
-		const index = clampedZ * this.heightMap.resolution + clampedX;
-		return this.heightMap.data[index];
+		const index = (z - this.minZ) * this.length + (x - this.minX);
+		return this.heightMap[index];
 	}
 
-	// Set height at specific local coordinates within the chunk
 	setHeightAt(x: number, z: number, height: number): void {
-		const clampedX = Math.max(0, Math.min(this.heightMap.resolution - 1, x));
-		const clampedZ = Math.max(0, Math.min(this.heightMap.resolution - 1, z));
-		
-		const index = clampedZ * this.heightMap.resolution + clampedX;
-		this.heightMap.data[index] = height;
+		const index = (z - this.minZ) * this.length + (x - this.minX);
+		this.heightMap[index] = height;
 	}
 
-	// Get chunk bounds in world coordinates
-	getBounds(): {
-		minX: number;
-		maxX: number;
-		minZ: number;
-		maxZ: number;
-	} {
-		return {
-			minX: this.position.x * this.dimensions.width,
-			maxX: (this.position.x + 1) * this.dimensions.width,
-			minZ: this.position.z * this.dimensions.depth,
-			maxZ: (this.position.z + 1) * this.dimensions.depth
-		};
+	getMinX(): number {
+		return this.minX;
+	}
+
+	setMinX(x: number) {
+		this.minX = x;
+	}
+
+	getMaxX(): number {
+		return this.maxX;
+	}
+
+	setMaxX(x: number) {
+		this.maxX = x;
+	}
+
+	getMinZ(): number {
+		return this.minX;
+	}
+
+	setMinZ(z: number) {
+		this.minZ = z;
+	}
+
+	getMaxZ(): number {
+		return this.maxX;
+	}
+
+	setMaxZ(z: number) {
+		this.maxZ = z;
+	}
+
+	getMinY(): number {
+		return this.minY;
+	}
+
+	setMinY(y: number) {
+		this.minY = y;
+	}
+
+	getMaxY(): number {
+		return this.maxY;
+	}
+
+	setMaxY(y: number) {
+		this.maxY = y;
 	}
 }
