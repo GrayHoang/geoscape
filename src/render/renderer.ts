@@ -195,7 +195,7 @@ Hit marchXZ(Ray primary) {
 				tMax.y = (stepDir.y > 0.0 ? 1.0 - voxelFrac.y : voxelFrac.y) * invD.y / 32.0;
 				tMax.z = (stepDir.z > 0.0 ? 1.0 - voxelFrac.z : voxelFrac.z) * invD.z / 32.0;
 
-				for (uint i = 0u; i < 64u; i++) {
+				for (uint i = 0u; i < max(64u, uint(chunkMaxY * 32.0) + 64u); i++) {
 					if (outOfChunk(P)) break;
 					if (sampleHeight(P)) return Hit(true, P, i);
 					if (tMax.x < tMax.y && tMax.x < tMax.z) {
@@ -237,11 +237,12 @@ Hit marchXZ(Ray primary) {
                
 				Ray ray = getPrimaryRay();
 				Hit hit;
-                if (dot(ray.dir, DOWN) >= sqrt(2.0)/2.0) {
-                    hit = marchXZ(ray);
-                } else {
-                    hit = march(ray);
-                }
+				hit = march(ray);
+                // if (dot(ray.dir, DOWN) >= sqrt(2.0)/2.0) {
+                //     hit = marchXZ(ray);
+                // } else {
+                //     hit = march(ray);
+                // }
 
 				if (hit.hit) {
 
