@@ -3,15 +3,12 @@ import { Input } from '../input';
 import { MovableCamera } from './camera';
 
 const CHUNK_SZ = 1;     // Side length of a chunk in world units
-const VIEW_DIAMETER = 4; // Side length of a "batch" of chunks in number of chunks
+const VIEW_DIAMETER = 5; // Side length of a "batch" of chunks in number of chunks
 
 const RAYMARCH_MAT = new THREE.ShaderMaterial({
 	// TODO actually read these from files
 	vertexShader: `
-		attribute vec3 pos;
-
-		uniform mat4 projMat;
-		uniform mat4 viewMat;
+		attribute vec4 transforms;
 
 		// x,z after modulo
 		varying vec2 bufIdx;
@@ -19,19 +16,20 @@ const RAYMARCH_MAT = new THREE.ShaderMaterial({
 		const float CHUNK_RADIUS = 4.0;
 
 		void main() {
-			bufIdx = vec2(pos.x % CHUNK_RADIUS, pos.y % CHUNK_RADIUS);
-			gl_Position = projMat * viewMat * vec4(pos, 1.0)
+			// bufIdx = vec2(pos.x % CHUNK_RADIUS, pos.y % CHUNK_RADIUS);
+			gl_Position = projectionMatrix * modelViewMatrix * vec4(position.x + transforms.x, (position.y + 0.5) * transforms.w + transforms.y - 0.5, position.z + transforms.z, 1.0);
 		}
 	`,
 	fragmentShader: `
-
+		varying vec2 bufIdx;
+		void main() {
+			gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+		}
 	`,
 });
 const BB_GEOM = new THREE.BoxGeometry(CHUNK_SZ, CHUNK_SZ, CHUNK_SZ);
-// const BB_MESH = new THREE.InstancedMesh(BB_GEOM, RAYMARCH_MAT, VIEW_DIAMETER * VIEW_DIAMETER);
-
-const DEBUG_GREEN_MAT = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-const DEBUG_CUBE = new THREE.Mesh(BB_GEOM, DEBUG_GREEN_MAT);
+const DEBUG_GREEN = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
+const DEBUG_STD = new THREE.MeshStandardMaterial();
 
 export class Renderer {
 	webgl = new THREE.WebGLRenderer();
@@ -39,6 +37,10 @@ export class Renderer {
 	scene = new THREE.Scene();
 	input = new Input(this.webgl.domElement);
 	camera = new MovableCamera(this.input);
+
+	bbTransforms = new Float32Array(VIEW_DIAMETER * VIEW_DIAMETER * 4);
+
+	instance = new THREE.InstancedMesh(BB_GEOM, RAYMARCH_MAT, VIEW_DIAMETER * VIEW_DIAMETER);
 	
 	constructor() {
 		this.resize();
@@ -49,7 +51,21 @@ export class Renderer {
 		this.input = new Input(this.webgl.domElement);
 		this.camera = new MovableCamera(this.input);
 		this.input.registerMouseCb(evt => this.camera.tickMouse(evt));
-		this.scene.add(DEBUG_CUBE);
+
+		this.instance.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+		this.scene.add(this.instance);
+
+		for (let i = 0; i < VIEW_DIAMETER * VIEW_DIAMETER; i++) {
+			this.bbTransforms[i * 4 + 0] = i % VIEW_DIAMETER;
+			this.bbTransforms[i * 4 + 1] = 0; // y min
+			this.bbTransforms[i * 4 + 2] = Math.floor(i / VIEW_DIAMETER);
+			this.bbTransforms[i * 4 + 3] = (i + 1) * 0.1; // height
+		}
+
+		BB_GEOM.setAttribute(
+			'transforms',
+			new THREE.InstancedBufferAttribute(this.bbTransforms, 4),
+		);
 	}
 
 	resize() {

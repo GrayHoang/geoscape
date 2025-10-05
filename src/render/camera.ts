@@ -67,10 +67,10 @@ export class MovableCamera {
 		if (this.#input.isPressed('KeyD')) {
 			this.#move(this.#dirR, -dt);
 		}
-		if (this.#input.isPressed('Space')) {
+		if (this.#input.isPressed('KeyE')) {
 			this.#move(UP_VEC, dt);
 		}
-		if (this.#input.isPressed('LeftShift')) {
+		if (this.#input.isPressed('KeyQ')) {
 			this.#move(UP_VEC, -dt);
 		}
 		this.#updateView();
