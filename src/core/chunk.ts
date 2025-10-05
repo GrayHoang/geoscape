@@ -71,7 +71,7 @@ export class Chunk {
 	}
 
 	getMaxZ(): number {
-		return this.maxX;
+		return this.maxZ;
 	}
 
 	setMaxZ(z: number) {

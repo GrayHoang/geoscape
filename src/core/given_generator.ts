@@ -97,11 +97,11 @@ export class GivenGenerator {
         for (let z = minZ; z < minZ + chunkLength; z++) {
             for (let x = minX; x < minX + chunkLength; x++) {
                 // Generate height using the terrain function
-                const worldPos = new THREE.Vector3(minX+ x, 0, minZ+ z);
+                const worldPos = new THREE.Vector3(x, 0, z);
                 const height = this.terrainHeightMap(worldPos);
                 
                 // Store in height map
-                chunk.setHeightAt(minX + x, minZ + z, height);
+                chunk.setHeightAt(x, z, height);
 
                 // check min/max
                 if (height < minY) {
