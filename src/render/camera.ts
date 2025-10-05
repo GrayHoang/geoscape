@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Input } from './input';
+import type { Input } from '../input';
 
 const UP_VEC = new THREE.Vector3(0.0, 1.0, 0.0);
 const ROT_SPEED = 0.1;
@@ -67,10 +67,10 @@ export class MovableCamera {
 		if (this.#input.isPressed('KeyD')) {
 			this.#move(this.#dirR, -dt);
 		}
-		if (this.#input.isPressed('Space')) {
+		if (this.#input.isPressed('KeyE')) {
 			this.#move(UP_VEC, dt);
 		}
-		if (this.#input.isPressed('LeftShift')) {
+		if (this.#input.isPressed('KeyQ')) {
 			this.#move(UP_VEC, -dt);
 		}
 		this.#updateView();
