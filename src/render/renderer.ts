@@ -36,6 +36,8 @@ export class Renderer {
 
 			// x,z after modulo
 			flat varying vec2 bufIdx;
+			varying float chunkMinY;
+			varying float chunkMaxY;
 			varying vec3 localPos;
 			varying mat4 invProjMat;
 			varying mat4 invViewMat;
@@ -48,6 +50,9 @@ export class Renderer {
 				vec3 pos = posPre;
 				pos.xz += transforms.xz;
 				pos.y = (pos.y) * transforms.w + transforms.y;
+
+				chunkMinY = transforms.y;
+				chunkMaxY = transforms.y + transforms.w;
 
 				localPos = posPre;
 				localPos.xz = posPre.xz;
@@ -69,11 +74,13 @@ export class Renderer {
 			uniform sampler2D heightmap;
 
 			flat varying vec2 bufIdx;
+			varying float chunkMinY;
+			varying float chunkMaxY;
 			varying vec3 localPos;
 			varying mat4 invProjMat;
 			varying mat4 invViewMat;
 
-			const float chunkSize = 5.0;
+			const float viewDiameter = 5.0;
 
 			struct Ray {
 				vec3 pos;
@@ -83,7 +90,7 @@ export class Renderer {
 			// pos's value is undefined when hit is false
 			struct Hit {
 				bool hit;
-				ivec3 pos;
+				vec3 pos;
 				uint steps;
 			};
 
@@ -91,87 +98,138 @@ export class Renderer {
 				vec2 uv = (gl_FragCoord.xy / scrSize) * 2.0 - 1.0;
 				vec4 targ = invProjMat * vec4(uv, 1.0, 1.0);
 				vec4 dir = invViewMat * vec4(normalize(targ.xyz / targ.w), 0.0);
-				return Ray(localPos, dir.xyz);
+				return Ray(localPos, normalize(dir.xyz));
+			}
+
+			bool outOfChunk(vec3 pos) {
+				return pos.x < 0.0
+						|| pos.x > 1.0
+						|| pos.z < 0.0
+						|| pos.z > 1.0
+						|| pos.y < chunkMinY
+						|| pos.y > chunkMaxY;
+			}
+
+			// xz between zero and one, representing pos in chunk
+			float getHeight(vec2 xz) {
+				xz += bufIdx;
+				xz /= viewDiameter;
+				return texture(heightmap, xz).r;
+			}
+
+			bool sampleHeight(vec3 pos) {
+				float y = pos.y;
+				vec2 uv = (floor(pos.xz * 32.0) + 0.5) / 32.0;
+				uv += bufIdx;
+				uv /= viewDiameter;
+				float height = texture(heightmap, uv).r;
+				return height > y + 1e-4;
+			}
+
+Hit marchXZ(Ray primary) {
+    vec3 P = primary.pos;
+    vec3 D = primary.dir;
+
+    // Project ray onto XZ plane
+    vec2 pos2 = P.xz;
+    vec2 dir2 = D.xz;
+
+    // Handle rays with near-zero XZ direction (straight up/down)
+    if (abs(dir2.x) < 1e-8 && abs(dir2.y) < 1e-8) {
+        return Hit(false, vec3(0.0), 0u);
+    }
+
+    vec2 invDir2 = 1.0 / max(abs(dir2), vec2(1e-8));
+    vec2 step2 = sign(dir2);
+
+    vec2 voxelPos2 = pos2 * 32.0;
+    vec2 voxelBase2 = floor(voxelPos2);
+    vec2 voxelFrac2 = voxelPos2 - voxelBase2;
+
+    vec2 tDelta2 = invDir2 / 32.0;
+    vec2 tMax2;
+    tMax2.x = (step2.x > 0.0 ? 1.0 - voxelFrac2.x : voxelFrac2.x) * invDir2.x / 32.0;
+    tMax2.y = (step2.y > 0.0 ? 1.0 - voxelFrac2.y : voxelFrac2.y) * invDir2.y / 32.0;
+
+    float t = 0.0;
+
+    for (uint i = 0u; i < 128u; i++) { // 128 is safe for a 32×32 grid
+        // Compute current world-space position
+        vec3 currPos = P + t * D;
+
+        if (outOfChunk(currPos)) break;
+
+        // Sample height at XZ
+        float h = getHeight(currPos.xz);
+
+        // Check if ray is below terrain at this point
+        if (currPos.y <= h + 1e-4) { // epsilon to avoid flicker
+            return Hit(true, currPos, i);
+        }
+
+        // Step to next voxel boundary in X or Z
+        if (tMax2.x < tMax2.y) {
+            t = tMax2.x;
+            tMax2.x += tDelta2.x;
+        } else {
+            t = tMax2.y;
+            tMax2.y += tDelta2.y;
+        }
+    }
+
+    return Hit(false, vec3(0.0), 0u);
+}
+
+			Hit march(Ray primary) {
+				vec3 P = primary.pos;
+				vec3 D = primary.dir;
+
+				vec3 voxelFrac = fract(P * 32.0);
+
+				vec3 invD = 1.0 / max(abs(D), vec3(1e-8));
+				vec3 tDelta = invD / 32.0;
+				vec3 stepDir = sign(D);
+
+				vec3 tMax;
+				tMax.x = (stepDir.x > 0.0 ? 1.0 - voxelFrac.x : voxelFrac.x) * invD.x / 32.0;
+				tMax.y = (stepDir.y > 0.0 ? 1.0 - voxelFrac.y : voxelFrac.y) * invD.y / 32.0;
+				tMax.z = (stepDir.z > 0.0 ? 1.0 - voxelFrac.z : voxelFrac.z) * invD.z / 32.0;
+
+				for (uint i = 0u; i < 64u; i++) {
+					if (outOfChunk(P)) break;
+					if (sampleHeight(P)) return Hit(true, P, i);
+					if (tMax.x < tMax.y && tMax.x < tMax.z) {
+						P.x += stepDir.x / 32.0;
+						tMax.x += tDelta.x;
+					} else if (tMax.y < tMax.z) {
+						P.y += stepDir.y / 32.0;
+						tMax.y += tDelta.y;
+					} else {
+						P.z += stepDir.z / 32.0;
+						tMax.z += tDelta.z;
+					}
+				}
+
+				return Hit(false, P, 0u);
 			}
 
 			void main() {
-				// TODO
-				// gl_FragColor = vec4(bufIdx / 5.0, 1.0, 1.0);
-				// gl_FragColor = vec4(localPos, 1.0);
-				// gl_FragColor = vec4(getPrimaryRay().dir, 1.0);
 				vec2 uv = gl_FragCoord.xy / scrSize;
 				uv += bufIdx;
-				uv /= chunkSize;
-				gl_FragColor = vec4(vec3(texture(heightmap, uv).r - 1.0), 1.0);
+				uv /= viewDiameter;
+				gl_FragColor = vec4(vec3(texture(heightmap, uv).r - 2.0), 1.0);
 
-// Ray ray = getPrimaryRay();
-// 	vec3 ro = ray.pos;
-// 	vec3 rd = normalize(ray.dir);
-//
-// 	// Clamp ray direction so it doesn't break DDA
-// 	if (abs(rd.x) < 1e-6) rd.x = 1e-6;
-// 	if (abs(rd.z) < 1e-6) rd.z = 1e-6;
-//
-// 	// Heightmap UV scaling
-// 	float mapSize = float(${HEIGHTMAP_SIZE}); // or pass as uniform
-//
-// 	// Current grid cell
-// 	ivec2 cell = ivec2(floor(ro.x), floor(ro.z));
-//
-// 	// Step direction for x,z
-// 	ivec2 step;
-// 	step.x = rd.x > 0.0 ? 1 : -1;
-// 	step.y = rd.z > 0.0 ? 1 : -1;
-//
-// 	// Compute initial tMax and tDelta for DDA
-// 	vec2 tMax;
-// 	vec2 tDelta;
-//
-// 	vec2 cellBorder = (vec2(cell) + vec2(step)) * 1.0;
-// 	tMax.x = (cellBorder.x - ro.x) / rd.x;
-// 	tMax.y = (cellBorder.y - ro.z) / rd.z;
-//
-// 	tDelta.x = 1.0 / abs(rd.x);
-// 	tDelta.y = 1.0 / abs(rd.z);
-//
-// 	bool hit = false;
-// 	uint steps = 0u;
-// 	const uint MAX_STEPS = 512u; // safety
-//
-// 	for (uint i = 0u; i < MAX_STEPS; i++) {
-// 		steps++;
-//
-// 		// Sample height at this cell
-// 		vec2 uv = (vec2(cell) + 0.5) / mapSize;
-// 		float h = texture(heightmap, uv).r;
-//
-// 		// Compute current point along ray at *bottom of this cell crossing*
-// 		float t = min(tMax.x, tMax.y);
-// 		vec3 p = ro + rd * t;
-//
-// 		// If ray is below terrain height at this cell => hit
-// 		if (p.y <= h) {
-// 			hit = true;
-// 			break;
-// 		}
-//
-// 		// Step to next cell along DDA
-// 		if (tMax.x < tMax.y) {
-// 			tMax.x += tDelta.x;
-// 			cell.x += step.x;
-// 		} else {
-// 			tMax.y += tDelta.y;
-// 			cell.y += step.y;
-// 		}
-// 	}
-//
-// 	if (hit) {
-// 		// visualize steps — normalize a bit
-// 		gl_FragColor = vec4(vec3(float(steps) / float(MAX_STEPS)) * 2.0, 1.0);
-// 	} else {
-// 		// gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-// discard;
-// 	}
+				Ray ray = getPrimaryRay();
+				Hit hit = marchXZ(ray);
+
+				if (hit.hit) {
+					gl_FragColor = vec4(hit.pos, 1.0);
+					// gl_FragColor = vec4(0.0, 1.0, 0.0, 1.0);
+					// gl_FragColor = vec4(vec3(float(hit.steps) / float(64)) * 2.0, 1.0);
+				} else {
+					// gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+					discard;
+				}
 			}
 		`,
 	})
