@@ -18,9 +18,15 @@ export class Renderer {
 
 	chunks = new ChunkManager(VIEW_DIAMETER, CHUNK_SIZE);
 	heightmapData = new Float32Array(HEIGHTMAP_SIZE**2);
-	heightmap = new THREE.DataTexture(this.heightmapData, HEIGHTMAP_SIZE, HEIGHTMAP_SIZE);
+	heightmap = new THREE.DataTexture(
+		this.heightmapData,
+		HEIGHTMAP_SIZE,
+		HEIGHTMAP_SIZE,
+		THREE.RedFormat,
+		THREE.FloatType,
+	);
 	material = new THREE.ShaderMaterial({
-		// TODO actually read these from files
+		// should actually read these from files, but we have no time
 		uniforms: {
 			scrSize: new THREE.Uniform(new THREE.Vector2()),
 			heightmap: { value: this.heightmap },
@@ -87,9 +93,79 @@ export class Renderer {
 			}
 
 			void main() {
-				gl_FragColor = vec4(bufIdx / 5.0, 1.0, 1.0);
+				// TODO
+				// gl_FragColor = vec4(bufIdx / 5.0, 1.0, 1.0);
 				// gl_FragColor = vec4(localPos, 1.0);
 				// gl_FragColor = vec4(getPrimaryRay().dir, 1.0);
+				gl_FragColor = vec4(vec3(texture(heightmap, gl_FragCoord.xy / scrSize * 0.2).r - 1.0), 1.0);
+// Ray ray = getPrimaryRay();
+// 	vec3 ro = ray.pos;
+// 	vec3 rd = normalize(ray.dir);
+//
+// 	// Clamp ray direction so it doesn't break DDA
+// 	if (abs(rd.x) < 1e-6) rd.x = 1e-6;
+// 	if (abs(rd.z) < 1e-6) rd.z = 1e-6;
+//
+// 	// Heightmap UV scaling
+// 	float mapSize = float(${HEIGHTMAP_SIZE}); // or pass as uniform
+//
+// 	// Current grid cell
+// 	ivec2 cell = ivec2(floor(ro.x), floor(ro.z));
+//
+// 	// Step direction for x,z
+// 	ivec2 step;
+// 	step.x = rd.x > 0.0 ? 1 : -1;
+// 	step.y = rd.z > 0.0 ? 1 : -1;
+//
+// 	// Compute initial tMax and tDelta for DDA
+// 	vec2 tMax;
+// 	vec2 tDelta;
+//
+// 	vec2 cellBorder = (vec2(cell) + vec2(step)) * 1.0;
+// 	tMax.x = (cellBorder.x - ro.x) / rd.x;
+// 	tMax.y = (cellBorder.y - ro.z) / rd.z;
+//
+// 	tDelta.x = 1.0 / abs(rd.x);
+// 	tDelta.y = 1.0 / abs(rd.z);
+//
+// 	bool hit = false;
+// 	uint steps = 0u;
+// 	const uint MAX_STEPS = 512u; // safety
+//
+// 	for (uint i = 0u; i < MAX_STEPS; i++) {
+// 		steps++;
+//
+// 		// Sample height at this cell
+// 		vec2 uv = (vec2(cell) + 0.5) / mapSize;
+// 		float h = texture(heightmap, uv).r;
+//
+// 		// Compute current point along ray at *bottom of this cell crossing*
+// 		float t = min(tMax.x, tMax.y);
+// 		vec3 p = ro + rd * t;
+//
+// 		// If ray is below terrain height at this cell => hit
+// 		if (p.y <= h) {
+// 			hit = true;
+// 			break;
+// 		}
+//
+// 		// Step to next cell along DDA
+// 		if (tMax.x < tMax.y) {
+// 			tMax.x += tDelta.x;
+// 			cell.x += step.x;
+// 		} else {
+// 			tMax.y += tDelta.y;
+// 			cell.y += step.y;
+// 		}
+// 	}
+//
+// 	if (hit) {
+// 		// visualize steps — normalize a bit
+// 		gl_FragColor = vec4(vec3(float(steps) / float(MAX_STEPS)) * 2.0, 1.0);
+// 	} else {
+// 		// gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+// discard;
+// 	}
 			}
 		`,
 	})
@@ -117,14 +193,31 @@ export class Renderer {
 		this.instance.frustumCulled = false;
 		this.scene.add(this.instance);
 
+		// METHOD 2:
+		// const gl = this.webgl.getContext();
+		// const props = this.webgl.properties.get(this.heightmap);
+		// const heightmapTex = props.__webglTexture;
+		// gl.bindTexture(gl.TEXTURE_2D, heightmapTex);
 		for (let i = 0; i < VIEW_DIAMETER * VIEW_DIAMETER; i++) {
-            let x = i % VIEW_DIAMETER;
-            let z = Math.floor(i/VIEW_DIAMETER);
+			let x = i % VIEW_DIAMETER;
+			let z = Math.floor(i/VIEW_DIAMETER);
 			this.bbTransforms[i * 4 + 0] = x;
 			this.bbTransforms[i * 4 + 1] = this.chunks.getMinY(x,z); // y min
 			this.bbTransforms[i * 4 + 2] = z;
-			this.bbTransforms[i * 4 + 3] = this.chunks.getHeight(x,z); // height
+			this.bbTransforms[i * 4 + 3] = this.chunks.getBBHeight(x,z); // height
+			// METHOD 1:
+			this.updateRegion(x, z);
+
+			// METHOD 2:
+			// gl.texSubImage2D(
+			// 	gl.TEXTURE_2D, 0,
+			// 	x, z, CHUNK_SIZE, CHUNK_SIZE,
+			// 	gl.RGBA, gl.FLOAT,
+			// 	this.chunks.getChunkData(x,z),
+			// );
 		}
+		// METHOD 2:
+		// gl.bindTexture(gl.TEXTURE_2D, null);
 
 		this.bbGeom.setAttribute(
 			'transforms',
@@ -132,7 +225,25 @@ export class Renderer {
 		);
 	}
 
-	resize() {
+	private updateRegion(x: number, z: number) {
+		const patch = Renderer.createChunkPatchTex(this.chunks.getChunkData(x, z));
+		const ofs = new THREE.Vector2(x * CHUNK_SIZE, z * CHUNK_SIZE);
+		this.webgl.copyTextureToTexture(patch, this.heightmap, null, ofs);
+	}
+
+	private static createChunkPatchTex(chunk: Float32Array): THREE.DataTexture {
+		const patch = new THREE.DataTexture(
+			chunk,
+			CHUNK_SIZE,
+			CHUNK_SIZE,
+			THREE.RedFormat,
+			THREE.FloatType,
+		);
+		patch.needsUpdate = true;
+		return patch;
+	}
+
+	private resize() {
 		this.webgl.setSize(window.innerWidth, window.innerHeight);
 		this.instance.material.uniforms.scrSize.value = new THREE.Vector2(
 			window.innerWidth,
@@ -140,7 +251,7 @@ export class Renderer {
 		);
 	}
 
-	tick() {
+	private tick() {
 		const dt = this.clock.getDelta();
 		this.camera.tick(dt);
 		this.webgl.render(this.scene, this.camera.inner);
