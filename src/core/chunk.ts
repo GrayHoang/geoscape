@@ -20,8 +20,8 @@ export class Chunk {
 		this.maxZ = minZ + length - 1;
 		this.length = length;
 		this.heightMap =  new Float32Array(length * length); // 16x16 grid = 256 height entries
-		this.minY = 0;
-        this.maxY = Infinity;
+		this.minY = Infinity;
+        this.maxY = 0;
 	}
 
 	getLength(): number {
