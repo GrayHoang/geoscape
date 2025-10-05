@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { Chunk } from "./chunk.ts"
 
+// High noise scale = peaks farther apart
+const NOISE_SCALE = 16;
+// Higher height scale = more contrast, deeper valleys and taller peaks
+const HEIGHT_POW = 2;
+
 export class GivenGenerator {
     
     /**
@@ -97,9 +102,9 @@ export class GivenGenerator {
         for (let z = minZ; z < minZ + chunkLength; z++) {
             for (let x = minX; x < minX + chunkLength; x++) {
                 // Generate height using the terrain function
-                const worldPos = new THREE.Vector3(x, 0, z);
-                let height = this.terrainHeightMap(worldPos);
-                height = height * height * height;
+                const worldPos = new THREE.Vector3(x/NOISE_SCALE, 0, z/NOISE_SCALE);
+                let height = this.terrainHeightMap(worldPos) ** HEIGHT_POW;
+                // height = height * height * height;
                 
                 // Store in height map
                 chunk.setHeightAt(x, z, height);
